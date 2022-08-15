@@ -1,9 +1,15 @@
-Hasher je skript, soužící ke generování hashů souborů na disku. Jeho použití je následujicí:
+Hasher je skript, soužící ke generování hashů souborů na disku.
+Pro sestavení ze zdrojových kódů je nutné mít nainstalovaný kompilátor jazyka go a program make.
+Binární soubor sestavíme pomocí příkazů
+$ make build/windows
+případně
+$ make build/linux
+Jeho použití je následujicí:
 $ ./hasher PATH
 kde parametr PATH je cesta od které se má hashovat. Na příklad na Linuxu:
 $ ./hasher /home/franta
 nebo na Windows:
-.\hasher C:\Users\franta
+.\hasher.exe C:\Users\franta
 Výsledkem je CSV soubor, jehož název je ve formátu:
 'hashInfo[Aug  9 153853].csv'
 s použitím data a času vytvoření CSV souboru.

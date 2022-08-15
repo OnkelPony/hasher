@@ -35,3 +35,19 @@ vendor:
 	go mod verify
 	@echo 'Vendoring dependencies...'
 	go mod vendor
+
+# ==================================================================================== #
+# BUILD
+# ==================================================================================== #
+
+## build/linux: build the linux binary
+.PHONY: build/linux
+build/linux:
+	@echo 'Building linux binary...'
+	GOOS=linux GOARCH=amd64 go build -ldflags='-s' -o=./hasher ./
+
+## build/windows: build the windows binary
+.PHONY: build/windows
+build/windows:
+	@echo 'Building windows binary...'
+	GOOS=windows GOARCH=amd64 go build -ldflags='-s' -o=./hasher.exe ./
