@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -21,37 +22,36 @@ type hashInfo struct {
 	sha256Sum string
 }
 
-var logName = strings.ReplaceAll("hashInfo["+time.Now().Format(time.Stamp)+"].", ":", "")
+var resultName = strings.ReplaceAll("hashInfo["+time.Now().Format(time.Stamp)+"].", ":", "")
 
 func main() {
 	start := time.Now()
 	root := os.Args[1]
-
+	var allHashes sort.StringSlice
 	allHashes, err := hashAll(root)
 	checkError("Can't hash files!", err)
-
-	resFile, err := os.Create(logName + "csv")
+	allHashes.Sort()
+	resultFile, err := os.Create(resultName + "csv")
 	checkError("Cannot create file", err)
 
-	writer := bufio.NewWriter(resFile)
+	writer := bufio.NewWriter(resultFile)
 	defer writer.Flush()
 
-	for file, threeHashes := range allHashes {
-		row := fmt.Sprintf("[%v], [%s], [%s], [%s]\n", file, threeHashes.md5Sum, threeHashes.sha1Sum, threeHashes.sha256Sum)
-		_, err = writer.WriteString(row)
+	for _, row := range allHashes {
+		_, err = writer.WriteString(row + "\n")
 		checkError("can't write to logfile", err)
 	}
 
 	fmt.Printf("Hashing took: %v\n", time.Since(start))
 }
 
-// hashAll returns map of files under root directory in parameter and its corresponding hashes.
-func hashAll(root string) (map[string]hashInfo, error) {
-	m := make(map[string]hashInfo)
+// hashAll returns slice of files under root directory in parameter and its corresponding hashes.
+func hashAll(root string) ([]string, error) {
+	var result []string
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, errWalk error) error {
 		if errWalk != nil {
-			f, err := os.OpenFile(logName+"err", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			f, err := os.OpenFile(resultName+"err", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 			if err != nil {
 				log.Fatalf("error opening file: %v", err)
 			}
@@ -75,7 +75,7 @@ func hashAll(root string) (map[string]hashInfo, error) {
 
 		defer file.Close()
 
-		m[path] = calculateBasicHashes(file)
+		result = append(result, calculateBasicHashes(file, path))
 
 		return nil
 	})
@@ -84,7 +84,7 @@ func hashAll(root string) (map[string]hashInfo, error) {
 		return nil, err
 	}
 
-	return m, nil
+	return result, nil
 }
 
 // checkError surprisingly checks for error.
@@ -95,8 +95,8 @@ func checkError(message string, err error) {
 }
 
 // calculateBasicHashes returns struct with all hashes of the Reader in parameter.
-func calculateBasicHashes(rd io.Reader) hashInfo {
-
+func calculateBasicHashes(rd io.Reader, path string) string {
+	result := "[" + path + "], "
 	md5hash := md5.New()
 	sha1hash := sha1.New()
 	sha256hash := sha256.New()
@@ -116,15 +116,12 @@ func calculateBasicHashes(rd io.Reader) hashInfo {
 	// Using a buffered reader, this will write to the writer multiplexer
 	// so we only traverse through the file once, and can calculate all hashInfo
 	// in a single byte buffered scan pass.
-	//
 	_, err := io.Copy(multiWriter, reader)
 	checkError("Can't copy to multiwriter", err)
 
-	var info hashInfo
+	result += "[" + hex.EncodeToString(md5hash.Sum(nil)) + "], "
+	result += "[" + hex.EncodeToString(sha1hash.Sum(nil)) + "], "
+	result += "[" + hex.EncodeToString(sha256hash.Sum(nil)) + "]"
 
-	info.md5Sum = hex.EncodeToString(md5hash.Sum(nil))
-	info.sha1Sum = hex.EncodeToString(sha1hash.Sum(nil))
-	info.sha256Sum = hex.EncodeToString(sha256hash.Sum(nil))
-
-	return info
+	return result
 }
