@@ -16,3 +16,4 @@ s použitím data a času vytvoření CSV souboru.
 Vnitřní formát souboru je:
 [/home/franta/notes/lw-sockets.txt], [8eb035fe270e5c04e63eca444ce72287], [d800934a25ab9fe91218bc7d70999652e831db44], [7dec79b860d4ee332b2966407769cc6bba218803b4689d2ec92ff50704ee58be]
 První položkou je cesta k souboru, druhou MD5 hash, třetí SHA1 hash a čtvrtou SHA256 hash.
+Řádky jsou seřazeny podle abecedy, je tedy možné provádět hashování stejného cíle v různých časech a pomocí nástroje diff zjistit rozdíly.
