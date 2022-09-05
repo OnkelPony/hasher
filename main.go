@@ -33,31 +33,17 @@ func main() {
 	flag.Parse()
 	var topDirectory string
 	if topDirectory = flag.Arg(0); topDirectory == "" {
-		if os := runtime.GOOS; os == "windows" {
+		if o := runtime.GOOS; o == "windows" {
 			topDirectory = `c:\`
 		} else {
 			topDirectory = "/"
 		}
 	}
+	app := application{}
 	if hashesFilename != "" {
-		f, err := os.Open(hashesFilename)
-		checkError("Can't open file", err)
-		defer f.Close()
-		reader := csv.NewReader(f)
-		reader.ReuseRecord = true
-		var allRecords []string
-		for {
-			record, err := reader.Read()
-			if err != nil {
-				if errors.Is(err, io.EOF) {
-					break
-				} else {
-					checkError("error reading file", err)
-				}
-			}
-			allRecords = append(allRecords, record...)
-		}
+		app.searchedHashes = getHashes(hashesFilename)
 	}
+	// fmt.Printf("application.searchedHashes: %v\n", app.searchedHashes)
 	resultName := strings.ReplaceAll(projName+"["+time.Now().Format(time.Stamp)+"].", ":", "")
 	var allHashes sort.StringSlice
 	allHashes, err := hashAll(topDirectory, resultName)
@@ -75,6 +61,29 @@ func main() {
 	}
 
 	fmt.Printf("Hashing took: %v\n", time.Since(start))
+}
+
+// getHashes returns slice of hashes from file entered as parameter.
+func getHashes(hashesFilename string) []string {
+	f, err := os.Open(hashesFilename)
+	checkError("Can't open file", err)
+	defer f.Close()
+	reader := csv.NewReader(f)
+	reader.TrimLeadingSpace = true
+	reader.LazyQuotes = true
+	var allRecords []string
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			} else {
+				checkError("error reading file", err)
+			}
+		}
+		allRecords = append(allRecords, record...)
+	}
+	return allRecords
 }
 
 // hashAll returns slice of files under directory in parameter and its corresponding hashes.
