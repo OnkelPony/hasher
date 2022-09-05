@@ -5,7 +5,9 @@ import (
 	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/csv"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -18,10 +20,16 @@ import (
 	"time"
 )
 
+type application struct {
+	searchedHashes []string
+}
+
 func main() {
 	start := time.Now()
 	var projName string
+	var hashesFilename string
 	flag.StringVar(&projName, "name", "hashInfo", "name of the hashing project")
+	flag.StringVar(&hashesFilename, "hashes", "", "name of the file containing hashes to search")
 	flag.Parse()
 	var topDirectory string
 	if topDirectory = flag.Arg(0); topDirectory == "" {
@@ -31,7 +39,26 @@ func main() {
 			topDirectory = "/"
 		}
 	}
-	var resultName = strings.ReplaceAll(projName+"["+time.Now().Format(time.Stamp)+"].", ":", "")
+	if hashesFilename != "" {
+		f, err := os.Open(hashesFilename)
+		checkError("Can't open file", err)
+		defer f.Close()
+		reader := csv.NewReader(f)
+		reader.ReuseRecord = true
+		var allRecords []string
+		for {
+			record, err := reader.Read()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				} else {
+					checkError("error reading file", err)
+				}
+			}
+			allRecords = append(allRecords, record...)
+		}
+	}
+	resultName := strings.ReplaceAll(projName+"["+time.Now().Format(time.Stamp)+"].", ":", "")
 	var allHashes sort.StringSlice
 	allHashes, err := hashAll(topDirectory, resultName)
 	checkError("Can't hash files!", err)
