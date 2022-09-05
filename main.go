@@ -6,29 +6,34 @@ import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
 )
 
-type hashInfo struct {
-	md5Sum    string
-	sha1Sum   string
-	sha256Sum string
-}
-
-var resultName = strings.ReplaceAll("hashInfo["+time.Now().Format(time.Stamp)+"].", ":", "")
-
 func main() {
 	start := time.Now()
-	root := os.Args[1]
+	var projName string
+	flag.StringVar(&projName, "name", "hashInfo", "name of the hashing project")
+	flag.Parse()
+	var topDirectory string
+	if topDirectory = flag.Arg(0); topDirectory == "" {
+		if os := runtime.GOOS; os == "windows" {
+			topDirectory = `c:\`
+		} else {
+			topDirectory = "/"
+		}
+	}
+	var resultName = strings.ReplaceAll(projName+"["+time.Now().Format(time.Stamp)+"].", ":", "")
 	var allHashes sort.StringSlice
-	allHashes, err := hashAll(root)
+	allHashes, err := hashAll(topDirectory, resultName)
 	checkError("Can't hash files!", err)
 	allHashes.Sort()
 	resultFile, err := os.Create(resultName + "csv")
@@ -45,8 +50,8 @@ func main() {
 	fmt.Printf("Hashing took: %v\n", time.Since(start))
 }
 
-// hashAll returns slice of files under root directory in parameter and its corresponding hashes.
-func hashAll(root string) ([]string, error) {
+// hashAll returns slice of files under directory in parameter and its corresponding hashes.
+func hashAll(root string, resultName string) ([]string, error) {
 	var result []string
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, errWalk error) error {
@@ -119,9 +124,12 @@ func calculateBasicHashes(rd io.Reader, path string) string {
 	_, err := io.Copy(multiWriter, reader)
 	checkError("Can't copy to multiwriter", err)
 
-	result += "[" + hex.EncodeToString(md5hash.Sum(nil)) + "], "
-	result += "[" + hex.EncodeToString(sha1hash.Sum(nil)) + "], "
-	result += "[" + hex.EncodeToString(sha256hash.Sum(nil)) + "]"
+	md5sum := hex.EncodeToString(md5hash.Sum(nil))
+	sha1sum := hex.EncodeToString(sha1hash.Sum(nil))
+	sha256sum := hex.EncodeToString(sha256hash.Sum(nil))
+	result += "[" + md5sum + "], "
+	result += "[" + sha1sum + "], "
+	result += "[" + sha256sum + "]"
 
 	return result
 }
