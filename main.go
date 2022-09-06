@@ -22,6 +22,7 @@ import (
 
 type application struct {
 	searchedHashes []string
+	foundFiles     map[string]bool
 }
 
 func main() {
@@ -42,11 +43,11 @@ func main() {
 	app := application{}
 	if hashesFilename != "" {
 		app.searchedHashes = getHashes(hashesFilename)
+		app.foundFiles = make(map[string]bool)
 	}
-	// fmt.Printf("application.searchedHashes: %v\n", app.searchedHashes)
 	resultName := strings.ReplaceAll(projName+"["+time.Now().Format(time.Stamp)+"].", ":", "")
 	var allHashes sort.StringSlice
-	allHashes, err := hashAll(topDirectory, resultName)
+	allHashes, err := app.hashAll(topDirectory, resultName)
 	checkError("Can't hash files!", err)
 	allHashes.Sort()
 	resultFile, err := os.Create(resultName + "csv")
@@ -59,7 +60,15 @@ func main() {
 		_, err = writer.WriteString(row + "\n")
 		checkError("can't write to logfile", err)
 	}
-
+	fmt.Println()
+	if len(app.foundFiles) > 0 {
+		var i int
+		fmt.Println("*** HASHES FOUND IN CHECKED FILES!!! ***")
+		for row, _ := range app.foundFiles {
+			i++
+			fmt.Println(i, row)
+		}
+	}
 	fmt.Printf("Hashing took: %v\n", time.Since(start))
 }
 
@@ -87,7 +96,7 @@ func getHashes(hashesFilename string) []string {
 }
 
 // hashAll returns slice of files under directory in parameter and its corresponding hashes.
-func hashAll(root string, resultName string) ([]string, error) {
+func (app *application) hashAll(root string, resultName string) ([]string, error) {
 	var result []string
 
 	err := filepath.Walk(root, func(path string, info os.FileInfo, errWalk error) error {
@@ -116,8 +125,10 @@ func hashAll(root string, resultName string) ([]string, error) {
 
 		defer file.Close()
 
-		result = append(result, calculateBasicHashes(file, path))
-
+		result = append(result, app.calculateBasicHashes(file, path))
+		if len(result)%10 == 0 {
+			fmt.Printf("\rNumber of hashed files: %d", len(result))
+		}
 		return nil
 	})
 
@@ -131,12 +142,12 @@ func hashAll(root string, resultName string) ([]string, error) {
 // checkError surprisingly checks for error.
 func checkError(message string, err error) {
 	if err != nil {
-		log.Println(message, err)
+		log.Fatal(message, err)
 	}
 }
 
 // calculateBasicHashes returns struct with all hashes of the Reader in parameter.
-func calculateBasicHashes(rd io.Reader, path string) string {
+func (app *application) calculateBasicHashes(rd io.Reader, path string) string {
 	result := "[" + path + "], "
 	md5hash := md5.New()
 	sha1hash := sha1.New()
@@ -163,9 +174,21 @@ func calculateBasicHashes(rd io.Reader, path string) string {
 	md5sum := hex.EncodeToString(md5hash.Sum(nil))
 	sha1sum := hex.EncodeToString(sha1hash.Sum(nil))
 	sha256sum := hex.EncodeToString(sha256hash.Sum(nil))
+	fileHashes := []string{md5sum, sha1sum, sha256sum}
+	app.findHashes(fileHashes, result)
 	result += "[" + md5sum + "], "
 	result += "[" + sha1sum + "], "
 	result += "[" + sha256sum + "]"
 
 	return result
+}
+
+func (app *application) findHashes(fileHashes []string, result string) {
+	for _, sh := range app.searchedHashes {
+		for _, fh := range fileHashes {
+			if sh == fh {
+				app.foundFiles[result+"["+fh+"]"] = true
+			}
+		}
+	}
 }
