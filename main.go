@@ -48,14 +48,13 @@ func main() {
 	resultName := strings.ReplaceAll(projName+"["+time.Now().Format(time.Stamp)+"].", ":", "")
 	var allHashes sort.StringSlice
 	allHashes, err := app.hashAll(topDirectory, resultName)
-	checkError("Can't hash files!", err)
+	checkError("can't hash files!", err)
 	allHashes.Sort()
 	resultFile, err := os.Create(resultName + "csv")
-	checkError("Cannot create file", err)
-
+	checkError("cannot create file", err)
+	defer resultFile.Close()
 	writer := bufio.NewWriter(resultFile)
 	defer writer.Flush()
-
 	for _, row := range allHashes {
 		_, err = writer.WriteString(row + "\n")
 		checkError("can't write to logfile", err)
@@ -64,12 +63,16 @@ func main() {
 	if len(app.foundFiles) > 0 {
 		var i int
 		fmt.Println("*** HASHES FOUND IN CHECKED FILES!!! ***")
-		for row, _ := range app.foundFiles {
+		for row := range app.foundFiles {
 			i++
 			fmt.Println(i, row)
 		}
 	}
 	fmt.Printf("Hashing took: %v\n", time.Since(start))
+	err = resultFile.Sync()
+	if err != nil {
+		fmt.Println()
+	}
 }
 
 // getHashes returns slice of hashes from file entered as parameter.
@@ -79,7 +82,7 @@ func getHashes(hashesFilename string) []string {
 	defer f.Close()
 	reader := csv.NewReader(f)
 	reader.TrimLeadingSpace = true
-	reader.LazyQuotes = true
+	reader.FieldsPerRecord = -1
 	var allRecords []string
 	for {
 		record, err := reader.Read()
@@ -98,44 +101,35 @@ func getHashes(hashesFilename string) []string {
 // hashAll returns slice of files under directory in parameter and its corresponding hashes.
 func (app *application) hashAll(root string, resultName string) ([]string, error) {
 	var result []string
-
 	err := filepath.Walk(root, func(path string, info os.FileInfo, errWalk error) error {
 		if errWalk != nil {
 			f, err := os.OpenFile(resultName+"err", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
 			if err != nil {
 				log.Fatalf("error opening file: %v", err)
 			}
-
 			defer f.Close()
-
 			log.SetOutput(f)
 			log.Println("Can't open file:", errWalk)
 			return nil
 		}
-
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-
 		file, err := os.OpenFile(path, os.O_RDONLY, 0)
 		if err != nil {
 			log.Println("Can't open file", err)
 			return nil
 		}
-
 		defer file.Close()
-
 		result = append(result, app.calculateBasicHashes(file, path))
 		if len(result)%10 == 0 {
 			fmt.Printf("\rNumber of hashed files: %d", len(result))
 		}
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
-
 	return result, nil
 }
 
@@ -179,7 +173,6 @@ func (app *application) calculateBasicHashes(rd io.Reader, path string) string {
 	result += "[" + md5sum + "], "
 	result += "[" + sha1sum + "], "
 	result += "[" + sha256sum + "]"
-
 	return result
 }
 
